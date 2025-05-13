@@ -1,0 +1,10 @@
+{
+	"id": "sync-omnifocus-task-plugin",
+	"name": "Sync OmniFocus Task Plugin",
+	"version": "1.0.0",
+	"minAppVersion": "0.15.0",
+	"description": "Sync OmniFocus tasks to Obsidian and update task completion status in Obsidian back to OmniFocus.",
+	"author": "PazerStudio Team",
+	"authorUrl": "https://pazergame.com",
+	"isDesktopOnly": true
+}
