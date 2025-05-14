@@ -7,24 +7,53 @@ async onload() {
 		// 监听点击事件
 	this.app.workspace.onLayoutReady(() => {
 	const container = this.app.workspace.containerEl;
-	this.registerDomEvent(container, 'click', (evt: MouseEvent) => {
-		console.log('点击事件:', evt);
+		this.registerDomEvent(container, 'click', (evt: MouseEvent) => {
 		const target = evt.target as HTMLElement;
-		if (target.matches('.task-list-item-checkbox')) {
-		const listItem = target.closest('.task-list-item');
-		if (listItem) {
-			const link = listItem.querySelector('a[href^="omnifocus://"]');
-			if (link) {
-			evt.preventDefault();
-			const href = link.getAttribute('href');
-			const taskId = href ? this.extractTaskId(href) : null;
-			if (taskId) this.toggleOmniFocusTask(taskId);
-			}
-		}
+			if (target.matches('.task-list-item-checkbox')) {
+				this.switchToPreviewIfEditing();
+				const listItem = target.closest('.task-list-item');
+				if (listItem) {
+					const link = listItem.querySelector('a[href^="omnifocus://"]');
+					if (link) {
+					evt.preventDefault();
+					const href = link.getAttribute('href');
+					const taskId = href ? this.extractTaskId(href) : null;
+					const isChecked = target instanceof HTMLInputElement ? target.checked : false;
+					console.log('Checkbox is', isChecked );
+					if (taskId) this.toggleOmniFocusTask(taskId,isChecked);
+					}
+				}
 		}
 	}, true); // 捕获阶段监听
 	});
 
+  }
+  
+  switchToPreviewIfEditing() {
+    const leaf = this.app.workspace.activeLeaf;
+
+    if (!leaf) return;
+
+    const view = leaf.view;
+
+    // 编辑视图的类型是 'markdown' 且状态 mode 为 'source'
+    const viewState = leaf.getViewState();
+
+    if (
+      viewState.type === "markdown" &&
+      (view as any).getMode && 
+      (view as any).getMode() === "source"
+    ) {
+      // 切换到预览模式
+      leaf.setViewState({
+        type: "markdown",
+        state: {
+          ...viewState.state,
+          mode: "preview",
+        },
+        active: true,
+      });
+    }
   }
 
   // 从URL提取OmniFocus任务ID
@@ -34,20 +63,20 @@ async onload() {
   }
 
   // 执行AppleScript操作OmniFocus
-	private toggleOmniFocusTask(taskId: string) {
-	console.log('切换OmniFocus任务:', taskId);
-	const appleScript = `
-	tell application "OmniFocus"
-		tell front document
-			set myTask to task id "${taskId}"
-			if completed of myTask is false then
-				mark complete myTask
-			else
-				mark incomplete myTask
-			end if
+	private toggleOmniFocusTask(taskId: string, isChecked: boolean) {
+		console.log('切换OmniFocus任务:', taskId);
+		const appleScript = `
+		tell application "OmniFocus"
+			tell front document
+				set myTask to task id "${taskId}"
+				if ${isChecked} then
+					mark complete myTask
+				else
+					mark incomplete myTask
+				end if
+			end tell
 		end tell
-	end tell
-    `;
+		`;
 
     exec(`osascript -e '${appleScript}'`, (err) => {
       if (err) {
