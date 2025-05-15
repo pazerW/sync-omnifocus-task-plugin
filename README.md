@@ -1,14 +1,31 @@
-# Sync Omnifocus Task Plugin
+## Features
 
-This is a plugin designed to synchronize the completion status of todo items in Obsidian with corresponding tasks in OmniFocus.  
+- Synchronize task completion status between Obsidian and OmniFocus.
+- Simple checkbox toggle in Obsidian updates the corresponding task in OmniFocus.
+- Supports direct linking to OmniFocus tasks using `omnifocus:///task/<task_id>` format.
 
-Obsidian Example:  
-```
-- [ ] [Sample Task](omnifocus:///task/abcdefgh)  
-```
-Clicking the checkbox in Obsidian with the above format will toggle the completion status of the linked task in OmniFocus.
+## Installation
 
+1. Download or clone the repository.
+2. Place the plugin files in your Obsidian plugins folder.
+3. Enable the plugin in Obsidian settings.
 
+## Usage
+
+1. Create a task in Obsidian using the format:
+    ```
+    - [ ] [Task Name](omnifocus:///task/<task_id>)
+    ```
+2. Toggle the checkbox to sync the task status with OmniFocus.
+
+## Limitations
+
+- Currently, only supports single-language usage.
+- Requires OmniFocus to be installed and configured on your device.
+
+## License
+
+This project is licensed under the MIT License. See the `LICENSE` file for details.
 
 
 这是一个用于同步Obsidian 当中Todolist 完成情况同步完成OmniFocus当中Task的插件；
