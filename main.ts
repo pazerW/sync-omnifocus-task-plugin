@@ -63,27 +63,40 @@ async onload() {
   }
 
   // 执行AppleScript操作OmniFocus
-	private toggleOmniFocusTask(taskId: string, isChecked: boolean) {
-		console.log('切换OmniFocus任务:', taskId);
-		const appleScript = `
-		tell application "OmniFocus"
-			tell front document
-				set myTask to task id "${taskId}"
-				if ${isChecked} then
-					mark complete myTask
-				else
-					mark incomplete myTask
-				end if
-			end tell
-		end tell
-		`;
+  private toggleOmniFocusTask(taskId: string, isChecked: boolean) {
+    console.log('切换OmniFocus任务:', taskId);
+    const appleScript = `
+    tell application "OmniFocus"
+      tell front document
+        set myTask to task id "${taskId}"
+        
+        -- 获取任务的截止时间
+        set taskDueDate to due date of myTask
+        set currentDate to current date
 
-    exec(`osascript -e '${appleScript}'`, (err) => {
+        -- 判断 due date 是否存在且小于等于今天，才进行操作
+        if taskDueDate is not missing value and taskDueDate ≤ currentDate then
+          if ${isChecked} then
+            mark complete myTask
+            return "✅ 更新至已完成"
+          else
+            mark incomplete myTask
+            return "✅ 更新至未完成"
+          end if
+        else
+          return "❌ 任务截止日期已过"
+        end if
+      end tell
+    end tell
+    `;
+
+    exec(`osascript -e '${appleScript}'`, (err, stdout) => {
       if (err) {
         console.error('OmniFocus同步失败:', err);
-        new Notice('❌ OmniFocus任务更新失败，请确保OmniFocus正在运行');
+        new Notice('OmniFocus任务更新失败，请确保OmniFocus正在运行');
       } else {
-        new Notice('✅ OmniFocus任务已完成同步');
+        console.log('AppleScript返回值:', stdout.trim());
+        new Notice(` ${stdout.trim()}`);
       }
     });
   }
