@@ -1,11 +1,58 @@
-import { Plugin, Notice, TFile } from 'obsidian';
+import { Plugin, Notice, App, PluginSettingTab, Setting, TFile } from 'obsidian';
 import { exec } from 'child_process';
+
+
+// 设置页面
+class OmniFocusSyncPluginSettingsTab extends PluginSettingTab {
+  plugin: OmniFocusSyncPlugin;
+
+  constructor(app: App, plugin: OmniFocusSyncPlugin) {
+      super(app, plugin);
+      this.plugin = plugin;
+  }
+
+  display(): void {
+      const { containerEl } = this;
+      containerEl.empty();
+
+      containerEl.createEl('h2', { text: 'SolidTime 设置' });
+
+      new Setting(containerEl)
+        .setName('移动已完成任务')
+        .setDesc('移动已完成任务到 ## 已完成任务')
+        .addToggle(toggle => toggle
+            .setValue(this.plugin.settings.moveCompletedTasks)
+            .onChange(async (value) => {
+                this.plugin.settings.moveCompletedTasks = value;
+                await this.plugin.saveSettings();
+                new Notice('设置已保存');
+            }));
+  }
+}
+
+interface OmniFocusSyncPluginSettings {
+   moveCompletedTasks: boolean;
+}
+
+// 默认设置
+const DEFAULT_SETTINGS: OmniFocusSyncPluginSettings = {
+  moveCompletedTasks: false,
+};
+
 
 export default class OmniFocusSyncPlugin extends Plugin {
   private cachedContent: string = '';
+  settings!: OmniFocusSyncPluginSettings;
 
 
-  async onload() {
+  
+
+    async onload() {
+
+    // 加载设置
+    await this.loadSettings();
+    this.addSettingTab(new OmniFocusSyncPluginSettingsTab(this.app, this));
+
     this.registerEvent(
       this.app.workspace.on('file-open', async (file) => {
         if (file instanceof TFile) {
@@ -34,7 +81,8 @@ export default class OmniFocusSyncPlugin extends Plugin {
       this.triggerCheckboxEvent(oldCheckboxes, newCheckboxes);
     }
     this.cachedContent = currentContent; // 更新缓存
-    this.onChangeOmniFocusTask();
+    // 移动已完成任务；
+    if (this.settings.moveCompletedTasks) this.onChangeOmniFocusTask();
   }
     
   // 从URL提取OmniFocus任务ID
@@ -86,7 +134,11 @@ export default class OmniFocusSyncPlugin extends Plugin {
         let lines = content.split('\n');
   
         // 步骤1：收集所有已完成任务及其原始索引
+        // 找到“已完成任务”标题行索引
+        const completedHeaderIndex = lines.findIndex(l => l.trim().startsWith('## 已完成任务'));
+        // 只处理标题行之前的内容
         const completedTasksWithIndices = lines
+          .slice(0, completedHeaderIndex === -1 ? lines.length : completedHeaderIndex)
           .map((line, index) => ({ line, index }))
           .filter(item => item.line.includes('- [x]'));
         // 步骤2：倒序删除原任务行（避免索引变化）
@@ -94,10 +146,16 @@ export default class OmniFocusSyncPlugin extends Plugin {
         indicesToDelete.forEach(index => lines.splice(index, 1));
   
         // 步骤3：提取任务内容
-        const completedTasks = completedTasksWithIndices.map(item => item.line);
+        const now = new Date();
+        const pad = (n: number) => n.toString().padStart(2, '0');
+        const timeStr = `${pad(now.getHours())}:${pad(now.getMinutes())}`;
+        const completedTasks = completedTasksWithIndices.map(item => {
+          // 在每个已完成任务行末尾加上时间
+          if (item.line.endsWith(timeStr)) return item.line;
+          return item.line + ` ${timeStr}`;
+        });
   
         // 步骤4：定位标题行
-        const completedHeaderIndex = lines.findIndex(l => l.trim().startsWith('## 已完成任务'));
         if (completedHeaderIndex !== -1) {
           // 步骤5：确定插入位置（标题行后第一个空行或直接追加）
           let nextLineIndex = completedHeaderIndex + 1;
@@ -157,11 +215,20 @@ private toggleOmniFocusTask(taskId: string, isChecked: boolean) {
   `;
 
   exec(`osascript -e '${appleScript}'`, (err, stdout) => {
-    if (err) {
-      new Notice('OmniFocus任务更新失败，请确保OmniFocus正在运行');
-    } else {
-      new Notice(` ${stdout.trim()}`);
-    }
-  });
+      if (err) {
+        new Notice('OmniFocus任务更新失败，请确保OmniFocus正在运行');
+      } else {
+        new Notice(` ${stdout.trim()}`);
+      }
+    });
+  }
+  
+  async loadSettings() {
+    this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+  }
+
+  async saveSettings() {
+    await this.saveData(this.settings);
+  }
 }
-}
+

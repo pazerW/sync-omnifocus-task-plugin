@@ -12,7 +12,9 @@ if you want to view the source, please visit the github repository of this plugi
 const manifest = JSON.parse(fs.readFileSync("./manifest.json", "utf-8"));
 const pluginId = manifest.id;
 const devPluginPath = `/Volumes/file/00_视频工作/04_直播文件/.obsidian/plugins/${pluginId}`;
-const buildPluginPath = `/Users/wang/Library/Mobile Documents/iCloud~md~obsidian/Documents/Base/.obsidian/plugins/${pluginId}`;
+const buildPluginPath = `/Volumes/file/00_视频工作/04_直播文件/.obsidian/plugins/${pluginId}`;
+// const buildPluginPath = `/Users/wang/Library/Mobile Documents/iCloud~md~obsidian/Documents/Base/.obsidian/plugins/${pluginId}`;
+
 const prod = process.argv[2] === "production";
 
 try {
