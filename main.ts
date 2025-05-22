@@ -34,6 +34,7 @@ export default class OmniFocusSyncPlugin extends Plugin {
       this.triggerCheckboxEvent(oldCheckboxes, newCheckboxes);
     }
     this.cachedContent = currentContent; // 更新缓存
+    this.onChangeOmniFocusTask();
   }
     
   // 从URL提取OmniFocus任务ID
@@ -74,50 +75,49 @@ export default class OmniFocusSyncPlugin extends Plugin {
     if (line.includes('omnifocus://')) {
       const taskId = this.extractTaskId(line);
       if (taskId) this.toggleOmniFocusTask(taskId, isCompleted);
-      console.log(isCompleted ? '已完成任务' : '未完成任务', line);
-      if (isCompleted) {
-        // 将当前行从原位置删除，并插入到“已完成任务”下的第二行
-        const file = this.app.workspace.getActiveFile();
-        if (!file) return;
-        this.app.vault.read(file).then(content => {
-          const lines = content.split('\n');
-          const lineIndex = lines.findIndex(l => l.trim() === line.trim());
-          if (lineIndex === -1) return;
-          // 删除原行
-          lines.splice(lineIndex, 1);
-          // 查找“已完成任务”标题
-          const completedHeaderIndex = lines.findIndex(l => l.trim().startsWith('## 已完成任务'));
-          
-          if (completedHeaderIndex !== -1) {
-            // 插入到“已完成任务”下的第二行（即标题后第二行，index+2）
-            const insertIndex = Math.min(completedHeaderIndex + 2, lines.length);
-            // 向上查找，移除插入点前的空行
-            let cleanInsertIndex = insertIndex;
-            while (cleanInsertIndex > 0 && lines[cleanInsertIndex - 1].trim() === '') {
-              cleanInsertIndex--;
-            }
-            if (line.trim() === '') return;
-            line = this.removeLineBreaks(line);
-            lines.splice(cleanInsertIndex, 0, line);
-          } else {
-            // 如果没有“已完成任务”标题，则插入到末尾
-            lines.push(line);
+    }
+  }
+
+  // 将已经完成的项目移动到已完成目录下；
+  private onChangeOmniFocusTask() {
+    const activeFile = this.app.workspace.getActiveFile();
+    if (activeFile) {
+      this.app.vault.read(activeFile).then(content => {
+        let lines = content.split('\n');
+  
+        // 步骤1：收集所有已完成任务及其原始索引
+        const completedTasksWithIndices = lines
+          .map((line, index) => ({ line, index }))
+          .filter(item => item.line.includes('- [x]'));
+        // 步骤2：倒序删除原任务行（避免索引变化）
+        const indicesToDelete = completedTasksWithIndices.map(item => item.index).sort((a, b) => b - a);
+        indicesToDelete.forEach(index => lines.splice(index, 1));
+  
+        // 步骤3：提取任务内容
+        const completedTasks = completedTasksWithIndices.map(item => item.line);
+  
+        // 步骤4：定位标题行
+        const completedHeaderIndex = lines.findIndex(l => l.trim().startsWith('## 已完成任务'));
+        if (completedHeaderIndex !== -1) {
+          // 步骤5：确定插入位置（标题行后第一个空行或直接追加）
+          let nextLineIndex = completedHeaderIndex + 1;
+          while (nextLineIndex < lines.length && lines[nextLineIndex].trim() !== '') {
+            nextLineIndex++;
           }
-          // 统计“已完成任务”下的已完成任务数量
-          let completedCount = 0;
-          if (completedHeaderIndex !== -1) {
-            for (let i = completedHeaderIndex + 1; i < lines.length; i++) {
-              const lineText = lines[i].trim();
-              if (lineText.startsWith('## ')) break; // 到下一个标题为止
-              if (/^-\s*\[x\]/i.test(lineText)) completedCount++;
-            }
-            // 更新标题为“已完成任务 - X 个”
-            lines[completedHeaderIndex] = `## 已完成任务 - ${completedCount} 个`;
-          }
-          this.app.vault.modify(file, lines.join('\n'));
-          new Notice('已完成任务已更新');
-        });
-      }
+          // 插入新任务（保持与原有内容的间隔）
+          lines.splice(nextLineIndex, 0, ...completedTasks);
+        } else {
+          new Notice('未找到"## 已完成任务"标题');
+          return;
+        }
+  
+        // 步骤6：写回文件
+        const newContent = lines.join('\n');
+        return this.app.vault.modify(activeFile, newContent);
+      }).catch(err => {
+        new Notice('处理文件时出错');
+        console.error(err);
+      });
     }
   }
 
