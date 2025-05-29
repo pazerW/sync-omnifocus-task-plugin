@@ -141,6 +141,30 @@ export default class OmniFocusSyncPlugin extends Plugin {
           .slice(0, completedHeaderIndex === -1 ? lines.length : completedHeaderIndex)
           .map((line, index) => ({ line, index }))
           .filter(item => item.line.includes('- [x]'));
+        
+        // 找到已完成任务下 已经完成的任务行的数量。
+        let count = 0;
+        for (let i = completedHeaderIndex + 1; i < lines.length; i++) {
+            const line = lines[i].trim();
+            
+            // Stop if we hit another header (starts with ##)
+            if (line.startsWith('##')) {
+                break;
+            }
+            // Count lines that are task items (assuming they start with - or *)
+            if (line.startsWith('- [x]') || line.startsWith('* [x]') || 
+                line.startsWith('- [X]') || line.startsWith('* [X]')) {
+                count++;
+            }
+        }
+        count += completedTasksWithIndices.length; 
+        // 替换 ## 已完成任务 标题行的内容
+        if (completedHeaderIndex !== -1) {
+          lines[completedHeaderIndex] = `## 已完成任务 - ${count}个`;
+        } else {
+          // 如果没有找到标题行，则添加一个新的标题行
+          lines.push(`## 已完成任务 - ${count}个`);
+        }
         // 步骤2：倒序删除原任务行（避免索引变化）
         const indicesToDelete = completedTasksWithIndices.map(item => item.index).sort((a, b) => b - a);
         indicesToDelete.forEach(index => lines.splice(index, 1));
@@ -171,7 +195,19 @@ export default class OmniFocusSyncPlugin extends Plugin {
   
         // 步骤6：写回文件
         const newContent = lines.join('\n');
-        return this.app.vault.modify(activeFile, newContent);
+        this.app.vault.modify(activeFile, newContent);
+        // 更新今日任务表行行的数量
+        // 先查找今日任务 ## 今日任务
+        const todayHeaderIndex = lines.findIndex(l => l.trim().startsWith('## 今日任务'));
+        if (todayHeaderIndex !== -1) {
+          // 计算今日任务数量
+          const todayTasksCount = lines.slice(todayHeaderIndex + 1)
+            .filter(line => line.trim().startsWith('- [ ]') || line.trim().startsWith('* [ ]')).length;
+          // 更新标题行
+          lines[todayHeaderIndex] = `## 今日任务 - ${todayTasksCount}个`;
+          // 写回文件
+          this.app.vault.modify(activeFile, lines.join('\n'));
+        }
       }).catch(err => {
         new Notice('处理文件时出错');
         console.error(err);
