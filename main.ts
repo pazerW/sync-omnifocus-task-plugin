@@ -45,10 +45,15 @@ export default class OmniFocusSyncPlugin extends Plugin {
   settings!: OmniFocusSyncPluginSettings;
 
 
-  
+
 
     async onload() {
-
+      const prod = process.env.NODE_ENV === "production";
+      if(prod) {
+        console.log("Production mode enabled");
+      } else {
+        console.log("Development mode enabled 13");
+      }
     // 加载设置
     await this.loadSettings();
     this.addSettingTab(new OmniFocusSyncPluginSettingsTab(this.app, this));
@@ -73,7 +78,10 @@ export default class OmniFocusSyncPlugin extends Plugin {
   
   private detectCheckboxChange(currentContent: string) {
     const oldContent = this.cachedContent; // 需要缓存上一次的文档内容
-    const checkboxRegex = /^\s*-\s\[( |x)\].*$/gm;
+    // const checkboxRegex = /^\s*-\s\[( |x)\].*$/gm;
+    // const checkboxRegex = /^(?!\s)-\s\[( |x)\].*$/gm;
+    const checkboxRegex = /^-\s\[x\]\s+(.+)$/gm;
+
     // 获取新旧内容中的复选框行
     const oldCheckboxes = oldContent.match(checkboxRegex) || [];
     const newCheckboxes = currentContent.match(checkboxRegex) || [];
