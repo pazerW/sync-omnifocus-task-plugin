@@ -52,7 +52,7 @@ export default class OmniFocusSyncPlugin extends Plugin {
       if(prod) {
         console.log("Production mode enabled");
       } else {
-        console.log("Development mode enabled 13");
+        console.log("Development mode enabled 14");
       }
     // 加载设置
     await this.loadSettings();
@@ -71,6 +71,7 @@ export default class OmniFocusSyncPlugin extends Plugin {
         if (file.path !== activeFile?.path) return; // 只处理当前文件
         this.app.vault.read(file).then(content => {
           this.detectCheckboxChange(content);
+          console.log('文件内容变化，检测复选框状态变化');
         });
       })
     );
@@ -103,13 +104,27 @@ export default class OmniFocusSyncPlugin extends Plugin {
   
   private triggerCheckboxEvent(old: string[], current: string[]) {
     // 遍历所有复选框行，对比状态
-    current.forEach((line, index) => {
-      const oldLine = old[index];
-      if (!this.isAcceptableDifference(oldLine, line)) return;
+    // 构建内容到索引的映射，允许顺序变化
+    const oldMap = new Map<string, string>();
+    old.forEach(line => {
+      // 用去除checkbox状态和日期后的内容作为key
+      const key = this.removeLineBreaks(line.replace(/- \[( |x)\]/, '').replace(/ ✅ \d{4}-\d{2}-\d{2}$/, '').trim());
+      oldMap.set(key, line);
+    });
+    current.forEach(line => {
+      const key = this.removeLineBreaks(line.replace(/- \[( |x)\]/, '').replace(/ ✅ \d{4}-\d{2}-\d{2}$/, '').trim());
+      const oldLine = oldMap.get(key);
+      if (!oldLine) { 
+        const isChecked = line.includes('[x]');
+        this.onSyncOmniFocusTask(line, isChecked);
+      }
+      if (!this.isAcceptableDifference(oldLine, line) ) return;
+
       if (oldLine && oldLine !== line) {
         const isChecked = line.includes('[x]');
         this.onSyncOmniFocusTask(line, isChecked);
       }
+
     });
   }
 
