@@ -245,39 +245,41 @@ export default class OmniFocusSyncPlugin extends Plugin {
 
 // 执行AppleScript操作OmniFocus
 private toggleOmniFocusTask(taskId: string, isChecked: boolean) {
-  const appleScript = `
-  tell application "OmniFocus"
-    tell front document
-    set myTask to task id "${taskId}"
-    set taskDueDate to due date of myTask
-    set currentDate to (current date) + (1 * days)
-    set isCompleted to completed of myTask
-
-    -- 判断 due date 是否存在且小于等于今天，才进行操作
-    if taskDueDate is not missing value and taskDueDate ≤ currentDate then
-      if (${isChecked} and isCompleted) or (not ${isChecked} and not isCompleted) then
-      return "ℹ️ 状态已更新，无需更改"
-      else
-      if ${isChecked} then
-        mark complete myTask
-        return "✅ 更新至已完成"
-      else
-        mark incomplete myTask
-        return "✅ 更新至未完成"
-      end if
-      end if
-    else
-      return "❌ 任务截止日期已过"
-    end if
+    const appleScript = `
+    tell application "OmniFocus"
+      tell front document
+        set myTask to task id "${taskId}"
+        set taskDueDate to due date of myTask
+        set isCompleted to completed of myTask
+        
+        -- 获取今天的0:00:00时间
+        set todayStart to (current date) - (time of (current date))
+        
+        -- 判断任务截止日期是否是今天
+        if taskDueDate is not missing value and taskDueDate ≥ todayStart and taskDueDate < (todayStart + 1 * days) then
+          if (${isChecked} and isCompleted) or (not ${isChecked} and not isCompleted) then
+            return "ℹ️ 状态已更新，无需更改"
+          else
+            if ${isChecked} then
+              mark complete myTask
+              return "✅ 更新至已完成"
+            else
+              mark incomplete myTask
+              return "✅ 更新至未完成"
+            end if
+          end if
+        else
+          return "❌ 任务截止日期不是今天"
+        end if
+      end tell
     end tell
-  end tell
-  `;
-
-  exec(`osascript -e '${appleScript}'`, (err, stdout) => {
+    `;
+    
+    exec(`osascript -e '${appleScript}'`, (err, stdout) => {
       if (err) {
-        new Notice('OmniFocus任务更新失败，请确保OmniFocus正在运行');
+        new Notice('错误 ：' + err.message);
       } else {
-        new Notice(` ${stdout.trim()}`);
+        new Notice(`${stdout.trim()}`);
       }
     });
   }
