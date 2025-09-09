@@ -1,6 +1,8 @@
 import { Plugin, Notice, App, PluginSettingTab, Setting, TFile } from 'obsidian';
 import { exec } from 'child_process';
 
+const PLUGIN_NAME = 'sync-omnifocus-task-plugin';
+const PLUGIN_VERSION = '1.0.6';
 
 // 设置页面
 class OmniFocusSyncPluginSettingsTab extends PluginSettingTab {
@@ -50,9 +52,9 @@ export default class OmniFocusSyncPlugin extends Plugin {
     async onload() {
       const prod = process.env.NODE_ENV === "production";
       if(prod) {
-        console.log("Production mode enabled");
+        console.log(`Production mode enabled ${PLUGIN_VERSION}`);
       } else {
-        console.log("Development mode enabled 14");
+        console.log(`Development mode enabled ${PLUGIN_VERSION}`);
       }
     // 加载设置
     await this.loadSettings();
@@ -71,7 +73,6 @@ export default class OmniFocusSyncPlugin extends Plugin {
         if (file.path !== activeFile?.path) return; // 只处理当前文件
         this.app.vault.read(file).then(content => {
           this.detectCheckboxChange(content);
-          console.log('文件内容变化，检测复选框状态变化');
         });
       })
     );
@@ -139,13 +140,33 @@ export default class OmniFocusSyncPlugin extends Plugin {
     const newBody = newStr.replace(checkboxRegex, '').replace(dateSuffixRegex, '').trim();
     return oldBody === newBody;
   }
-
-  
+  private recentlyModified: Set<string> = new Set(); // 改为使用 Set
 
   private onSyncOmniFocusTask(line: string, isCompleted: boolean) {
+    const taskId = this.extractTaskId(line);
+    // 检查是否包含最近修改的内容，如果没有则继续，有则返回
+      if (taskId && this.recentlyModified.has(taskId)) {
+          this.recentlyModified.delete(taskId);
+          return;
+      }
     if (line.includes('omnifocus://')) {
       const taskId = this.extractTaskId(line);
       if (taskId) this.toggleOmniFocusTask(taskId, isCompleted);
+    }
+    // 将此次修改加入最近修改数组，防止重复处理
+    if (taskId) {
+        this.recentlyModified.add(taskId);
+        // 5秒后自动移除，避免永久阻挡
+        setTimeout(() => {
+            this.recentlyModified.delete(taskId);
+        }, 5000);
+    }
+    
+    // 保持集合大小不超过10个
+    if (this.recentlyModified.size > 10) {
+        // 移除最早的一个（Set没有顺序，所以需要转换）
+        const first = Array.from(this.recentlyModified)[0];
+        this.recentlyModified.delete(first);
     }
   }
 
