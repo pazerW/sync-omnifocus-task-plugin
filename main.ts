@@ -170,6 +170,21 @@ export default class OmniFocusSyncPlugin extends Plugin {
     }
   }
 
+  // 检查某行是否在代码块内
+  private isLineInCodeBlock(lines: string[], lineIndex: number): boolean {
+    let inCodeBlock = false;
+    
+    for (let i = 0; i <= lineIndex; i++) {
+      const line = lines[i].trim();
+      // 检测代码块开始和结束标记
+      if (line.startsWith('```')) {
+        inCodeBlock = !inCodeBlock;
+      }
+    }
+    
+    return inCodeBlock;
+  }
+
   // 将已经完成的项目移动到已完成目录下；
   private onChangeOmniFocusTask() {
     const activeFile = this.app.workspace.getActiveFile();
@@ -184,8 +199,8 @@ export default class OmniFocusSyncPlugin extends Plugin {
         const completedTasksWithIndices = lines
           .slice(0, completedHeaderIndex === -1 ? lines.length : completedHeaderIndex)
           .map((line, index) => ({ line, index }))
-          .filter(item => item.line.includes('- [x]'));
-        
+          .filter(item => item.line.includes('- [x]'))
+          .filter(item => !this.isLineInCodeBlock(lines, item.index));
         // 找到已完成任务下 已经完成的任务行的数量。
         let count = 0;
         for (let i = completedHeaderIndex + 1; i < lines.length; i++) {
