@@ -79,25 +79,98 @@ export default class OmniFocusSyncPlugin extends Plugin {
 }
   
   private detectCheckboxChange(currentContent: string) {
-    const oldContent = this.cachedContent; // 需要缓存上一次的文档内容
-    // const checkboxRegex = /^\s*-\s\[( |x)\].*$/gm;
-    // const checkboxRegex = /^(?!\s)-\s\[( |x)\].*$/gm;
+    const oldContent = this.cachedContent;
     const checkboxRegex = /^-\s\[x\]\s+(.+)$/gm;
-
-    // 获取新旧内容中的复选框行
+  
     const oldCheckboxes = oldContent.match(checkboxRegex) || [];
     const newCheckboxes = currentContent.match(checkboxRegex) || [];
+    
     if (oldCheckboxes.join() !== newCheckboxes.join()) {
       this.triggerCheckboxEvent(oldCheckboxes, newCheckboxes);
+      // 新增：处理文档内相同任务ID的行同步
+      this.syncSameTaskIdLines(currentContent);
     }
-    this.cachedContent = currentContent; // 更新缓存
-    // 移动已完成任务；
+    
+    this.cachedContent = currentContent;
     if (this.settings.moveCompletedTasks) this.onChangeOmniFocusTask();
   }
+  
+  // 新增方法：同步文档内相同任务ID的行
+  private syncSameTaskIdLines(content: string) {
+    const activeFile = this.app.workspace.getActiveFile();
+    if (!activeFile) return;
+  
+    const lines = content.split('\n');
+    const taskIdToLines = new Map<string, { line: string; index: number; isChecked: boolean }[]>();
     
-  // 从URL提取OmniFocus任务ID
-  // omnifocus:///task/jhFv9AJqnNX.235
-  // omnifocus:///task/jhFv9AJqnNX
+    // 收集所有任务行，包括带链接和带#ID的行
+    lines.forEach((line, index) => {
+      let taskId: string | null = null;
+      
+      // 方式1：从OmniFocus链接中提取任务ID
+      if (line.includes('omnifocus://')) {
+        taskId = this.extractTaskId(line);
+      }
+      
+      // 方式2：从#ID格式中提取任务ID
+      if (!taskId) {
+        const idMatch = line.match(/#([a-zA-Z0-9_-]+)$/);
+        if (idMatch) {
+          taskId = idMatch[1];
+        }
+      }
+      
+      if (taskId) {
+        const isChecked = line.includes('- [x]');
+        
+        if (!taskIdToLines.has(taskId)) {
+          taskIdToLines.set(taskId, []);
+        }
+        taskIdToLines.get(taskId)!.push({ line, index, isChecked });
+      }
+    });
+    
+    // 检查每个任务ID是否需要同步状态
+    let needsUpdate = false;
+    const updatedLines = [...lines];
+    
+    taskIdToLines.forEach((taskLines, taskId) => {
+      if (taskLines.length > 1) {
+        // 检查是否所有行的状态都一致
+        const statusCounts = { checked: 0, unchecked: 0 };
+        taskLines.forEach(item => {
+          if (item.isChecked) statusCounts.checked++;
+          else statusCounts.unchecked++;
+        });
+        
+        // 如果状态不一致，同步到多数状态，如果相等则同步到已完成状态
+        if (statusCounts.checked !== taskLines.length && statusCounts.unchecked !== taskLines.length) {
+          const targetStatus = statusCounts.checked >= statusCounts.unchecked;
+          
+          // 同步所有行到目标状态
+          taskLines.forEach(item => {
+            if (item.isChecked !== targetStatus) {
+              const newLine = targetStatus 
+                ? item.line.replace('- [ ]', '- [x]')
+                : item.line.replace('- [x]', '- [ ]');
+              
+              updatedLines[item.index] = newLine;
+              needsUpdate = true;
+            }
+          });
+        }
+      }
+    });
+    
+    // 如果有更新，写回文件
+    if (needsUpdate) {
+      const newContent = updatedLines.join('\n');
+      this.app.vault.modify(activeFile, newContent);
+    }
+  }
+  
+  // ...existing code...
+
   private extractTaskId(url: string): string | null {
     const match = url.match(/omnifocus:\/\/\/task\/([\w-]+(?:\.\d+)?)/);
     return match ? match[1] : null;
