@@ -111,10 +111,11 @@ export default class OmniFocusSyncPlugin extends Plugin {
       if (line.includes('omnifocus://')) {
         taskId = this.extractTaskId(line);
       }
-      
       // 方式2：从#ID格式中提取任务ID
       if (!taskId) {
-        const idMatch = line.match(/#([a-zA-Z0-9_-]+)$/);
+        // - [ ]  【建身&&跑步】跑步&&建身 🏷️ 每日, Health @17:00-18:00 #jhFv9AJqnNX.235.37
+        // 支持 #ID 在行尾或中间（如 #jhFv9AJqnNX.235.37 或 #jhFv9AJqnNX）
+        const idMatch = line.match(/#([a-zA-Z0-9_-]+)/);
         if (idMatch) {
           taskId = idMatch[1];
         }
@@ -129,7 +130,6 @@ export default class OmniFocusSyncPlugin extends Plugin {
         taskIdToLines.get(taskId)!.push({ line, index, isChecked });
       }
     });
-    
     // 检查每个任务ID是否需要同步状态
     let needsUpdate = false;
     const updatedLines = [...lines];
@@ -171,7 +171,7 @@ export default class OmniFocusSyncPlugin extends Plugin {
   
 
   private extractTaskId(url: string): string | null {
-    const match = url.match(/omnifocus:\/\/\/task\/([\w-]+(?:\.\d+)?)/);
+    const match = url.match(/omnifocus:\/\/\/task\/([\w-]+(?:\d+)?)/);
     return match ? match[1] : null;
   }
   
