@@ -169,7 +169,6 @@ export default class OmniFocusSyncPlugin extends Plugin {
     }
   }
   
-  // ...existing code...
 
   private extractTaskId(url: string): string | null {
     const match = url.match(/omnifocus:\/\/\/task\/([\w-]+(?:\.\d+)?)/);
