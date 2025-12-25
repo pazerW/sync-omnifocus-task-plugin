@@ -21,7 +21,7 @@ class OmniFocusSyncPluginSettingsTab extends PluginSettingTab {
 
       new Setting(containerEl)
         .setName('移动已完成任务')
-        .setDesc('移动已完成任务到 ## 已完成任务')
+        .setDesc('移动已完成任务到 ### 已完成任务')
         .addToggle(toggle => toggle
             .setValue(this.plugin.settings.moveCompletedTasks)
             .onChange(async (value) => {
@@ -266,7 +266,7 @@ export default class OmniFocusSyncPlugin extends Plugin {
   
         // 步骤1：收集所有已完成任务及其原始索引
         // 找到“已完成任务”标题行索引
-        const completedHeaderIndex = lines.findIndex(l => l.trim().startsWith('## 已完成任务'));
+        const completedHeaderIndex = lines.findIndex(l => l.trim().startsWith('### 已完成任务'));
         // 只处理标题行之前的内容
         const completedTasksWithIndices = lines
           .slice(0, completedHeaderIndex === -1 ? lines.length : completedHeaderIndex)
@@ -289,12 +289,12 @@ export default class OmniFocusSyncPlugin extends Plugin {
             }
         }
         count += completedTasksWithIndices.length; 
-        // 替换 ## 已完成任务 标题行的内容
+        // 替换 ### 已完成任务 标题行的内容
         if (completedHeaderIndex !== -1) {
-          lines[completedHeaderIndex] = `## 已完成任务 - ${count}个`;
+          lines[completedHeaderIndex] = `### 已完成任务 - ${count}个`;
         } else {
           // 如果没有找到标题行，则添加一个新的标题行
-          lines.push(`## 已完成任务 - ${count}个`);
+          lines.push(`### 已完成任务 - ${count}个`);
         }
         // 步骤2：倒序删除原任务行（避免索引变化）
         const indicesToDelete = completedTasksWithIndices.map(item => item.index).sort((a, b) => b - a);
@@ -320,7 +320,7 @@ export default class OmniFocusSyncPlugin extends Plugin {
           // 插入新任务（保持与原有内容的间隔）
           lines.splice(nextLineIndex, 0, ...completedTasks);
         } else {
-          new Notice('未找到"## 已完成任务"标题');
+          new Notice('未找到"### 已完成任务"标题');
           return;
         }
   
